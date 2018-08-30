@@ -9,8 +9,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
-
-	. "kubevirt.io/containerized-data-importer/pkg/common"
 )
 
 func ParseEnvVar(envVarName string, decode bool) (string, error) {
@@ -47,7 +45,7 @@ func StreamDataToFile(dataReader io.Reader, filePath string) error {
 	if err != nil {
 		return errors.Wrapf(err, "could not open file %q", filePath)
 	}
-	glog.V(Vuser).Infof("begin import...\n")
+	glog.V(1).Infof("begin import...\n")
 	if _, err = io.Copy(outFile, dataReader); err != nil {
 		os.Remove(outFile.Name())
 		return errors.Wrapf(err, "unable to write to file")

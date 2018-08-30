@@ -16,19 +16,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
-	. "kubevirt.io/containerized-data-importer/pkg/common"
 	expectations "kubevirt.io/containerized-data-importer/pkg/expectations"
-)
-
-const (
-	// pvc annotations
-	AnnEndpoint  = "cdi.kubevirt.io/storage.import.endpoint"
-	AnnSecret    = "cdi.kubevirt.io/storage.import.secretName"
-	AnnImportPod = "cdi.kubevirt.io/storage.import.importPodName"
-	// importer pod annotations
-	AnnCreatedBy   = "cdi.kubevirt.io/storage.createdByController"
-	AnnPodPhase    = "cdi.kubevirt.io/storage.import.pod.phase"
-	LabelImportPvc = "cdi.kubevirt.io/storage.import.importPvcName"
 )
 
 type ImportController struct {
@@ -124,9 +112,9 @@ func (c *ImportController) handlePodObject(obj interface{}, verb string) {
 			runtime.HandleError(errors.Errorf("error decoding object tombstone, invalid type"))
 			return
 		}
-		glog.V(Vdebug).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
+		glog.V(3).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 	}
-	glog.V(Vdebug).Infof("Processing object: %s", object.GetName())
+	glog.V(3).Infof("Processing object: %s", object.GetName())
 	if ownerRef := metav1.GetControllerOf(object); ownerRef != nil {
 		_, createdByUs := object.GetAnnotations()[AnnCreatedBy]
 
@@ -138,7 +126,7 @@ func (c *ImportController) handlePodObject(obj interface{}, verb string) {
 
 		pvc, err := c.pvcLister.PersistentVolumeClaims(object.GetNamespace()).Get(ownerRef.Name)
 		if err != nil {
-			glog.V(Vdebug).Infof("ignoring orphaned object '%s' of pvc '%s'", object.GetSelfLink(), ownerRef.Name)
+			glog.V(3).Infof("ignoring orphaned object '%s' of pvc '%s'", object.GetSelfLink(), ownerRef.Name)
 			return
 		}
 
@@ -170,7 +158,7 @@ func (c *ImportController) Run(threadiness int, stopCh <-chan struct{}) error {
 	defer func() {
 		c.queue.ShutDown()
 	}()
-	glog.V(Vadmin).Infoln("Starting cdi controller Run loop")
+	glog.V(2).Infoln("Starting cdi controller Run loop")
 	if threadiness < 1 {
 		return errors.Errorf("expected >0 threads, got %d", threadiness)
 	}
@@ -181,7 +169,7 @@ func (c *ImportController) Run(threadiness int, stopCh <-chan struct{}) error {
 	if !cache.WaitForCacheSync(stopCh, c.podInformer.HasSynced) {
 		return errors.New("Timeout waiting for pod cache sync")
 	}
-	glog.V(Vdebug).Infoln("ImportController cache has synced")
+	glog.V(3).Infoln("ImportController cache has synced")
 
 	for i := 0; i < threadiness; i++ {
 		go wait.Until(c.runPVCWorkers, time.Second, stopCh)
@@ -207,7 +195,7 @@ func (c *ImportController) syncPvc(key string) error {
 	if !checkPVC(pvc) {
 		return nil
 	}
-	glog.V(Vdebug).Infof("ProcessNextPvcItem: next pvc to process: %s\n", key)
+	glog.V(3).Infof("ProcessNextPvcItem: next pvc to process: %s\n", key)
 	return c.processPvcItem(pvc)
 }
 
@@ -291,7 +279,7 @@ func (c *ImportController) processPvcItem(pvc *v1.PersistentVolumeClaim) error {
 			return err
 		}
 		if secretName == "" {
-			glog.V(Vadmin).Infof("no secret will be supplied to endpoint %q\n", ep)
+			glog.V(2).Infof("no secret will be supplied to endpoint %q\n", ep)
 		}
 
 		// all checks passed, let's create the importer pod!
@@ -326,7 +314,7 @@ func (c *ImportController) processPvcItem(pvc *v1.PersistentVolumeClaim) error {
 // forget the passed-in key for this event and optionally log a message.
 func (c *ImportController) forgetKey(key interface{}, msg string) bool {
 	if len(msg) > 0 {
-		glog.V(Vdebug).Info(msg)
+		glog.V(3).Info(msg)
 	}
 	c.queue.Forget(key)
 	return true

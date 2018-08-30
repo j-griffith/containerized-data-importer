@@ -26,7 +26,7 @@ const (
 	IMPORTER_DEFAULT_IMAGE = "kubevirt/cdi-importer:latest"
 )
 
-var verboseDebug = fmt.Sprintf("%d", Vdebug)
+var verboseDebug = fmt.Sprintf("%d", 3)
 
 var _ = Describe("Controller", func() {
 	var (
@@ -56,7 +56,7 @@ var _ = Describe("Controller", func() {
 		pvcInformer := pvcInformerFactory.Core().V1().PersistentVolumeClaims()
 		podInformer := podInformerFactory.Core().V1().Pods()
 
-		controller = NewImportController(fakeClient, pvcInformer, podInformer, IMPORTER_DEFAULT_IMAGE, DEFAULT_PULL_POLICY, verboseDebug)
+		controller = NewImportController(fakeClient, pvcInformer, podInformer, IMPORTER_DEFAULT_IMAGE, controller.DEFAULT_PULL_POLICY, verboseDebug)
 
 		go pvcInformerFactory.Start(stop)
 		go podInformerFactory.Start(stop)

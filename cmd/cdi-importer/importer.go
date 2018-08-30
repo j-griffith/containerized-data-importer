@@ -18,8 +18,14 @@ import (
 
 	"github.com/golang/glog"
 
-	. "kubevirt.io/containerized-data-importer/pkg/common"
-	. "kubevirt.io/containerized-data-importer/pkg/importer"
+	"kubevirt.io/containerized-data-importer/pkg/importer"
+)
+
+// Constants we use as env variables for the importer
+const (
+	importerEndpoint    = "IMPORTER_ENDPOINT"
+	importerAccessKeyID = "IMPORTER_ACCESS_KEY_ID"
+	importerSecretKey   = "IMPORTER_SECRET_KEY"
 )
 
 func init() {
@@ -29,18 +35,18 @@ func init() {
 func main() {
 	defer glog.Flush()
 
-	glog.V(Vuser).Infoln("Starting importer")
-	ep, _ := ParseEnvVar(IMPORTER_ENDPOINT, false)
-	acc, _ := ParseEnvVar(IMPORTER_ACCESS_KEY_ID, false)
-	sec, _ := ParseEnvVar(IMPORTER_SECRET_KEY, false)
+	glog.V(1).Infoln("Starting importer")
+	ep, _ := importer.ParseEnvVar(importerEndpoint, false)
+	acc, _ := importer.ParseEnvVar(importerAccessKeyID, false)
+	sec, _ := importer.ParseEnvVar(importerSecretKey, false)
 
-	glog.V(Vuser).Infoln("begin import process")
-	err := CopyImage(IMPORTER_WRITE_PATH, ep, acc, sec)
+	glog.V(1).Infoln("begin import process")
+	err := importer.CopyImage(importer.IMPORTER_WRITE_PATH, ep, acc, sec)
 	if err != nil {
 		glog.Errorf("%+v", err)
 		os.Exit(1)
 	}
-	glog.V(Vuser).Infoln("import complete")
+	glog.V(1).Infoln("import complete")
 
 	// temporary local import deprecation notice
 	glog.Warningf("\nDEPRECATION NOTICE:\n   Support for local (file://) endpoints will be removed from CDI in the next release.\n   There is no replacement and no work-around.\n   All import endpoints must reference http(s) or s3 endpoints\n")

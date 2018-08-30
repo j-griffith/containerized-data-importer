@@ -21,6 +21,10 @@ import (
 	"kubevirt.io/containerized-data-importer/tests/utils"
 )
 
+const (
+	IMPORTER_WRITE_FILE = "disk.img"
+)
+
 var _ = Describe("Streaming Data Conversion", func() {
 
 	Context("when data is in a supported file format", func() {
