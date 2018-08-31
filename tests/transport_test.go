@@ -40,6 +40,8 @@ var _ = Describe("Transport Tests", func() {
 	httpAuthEp := fmt.Sprintf("http://%s:%d/%s", fileHostService.Spec.ClusterIP, httoAuthPort, targetFile)
 	httpNoAuthEp := fmt.Sprintf("http://%s:%d/%s", fileHostService.Spec.ClusterIP, noAuthPort, targetFile)
 
+	utils.FileHostCatalog(httpNoAuthEp)
+
 	var ns string
 	BeforeEach(func() {
 		ns = f.Namespace.Name
