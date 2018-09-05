@@ -85,3 +85,22 @@ func GetServicePortByName(svc *v1.Service, name string) (int, error) {
 	}
 	return port, nil
 }
+
+
+func GetServiceNodePortByName(svc *v1.Service, name string) (int, error) {
+	if svc == nil {
+		return 0, errors.New("nil service")
+	}
+
+	var port int
+	for _, p := range svc.Spec.Ports {
+		if p.Name == name {
+			port = int(p.NodePort)
+			break
+		}
+	}
+	if port == 0 {
+		return 0, errors.Errorf("port %q not found", name)
+	}
+	return port, nil
+}

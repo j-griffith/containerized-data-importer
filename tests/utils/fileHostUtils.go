@@ -3,38 +3,58 @@ package utils
 import (
 	"net/http"
 	"encoding/json"
-	"time"
 	"io/ioutil"
-	"github.com/golang/glog"
+	"github.com/pkg/errors"
+	"time"
 )
 
-type fileCatalog []imageMeta
+type FileCatalog []ImageMeta
 
-type imageMeta struct {
-	Name string `json:"name"`
+type ImageMeta struct {
+	Name     string `json:"name"`
 	ItemType string `json:"type"`
-	Mtime string `json:"mtime"`
-	size int32 `json:"size"`
+	Mtime    string `json:"mtime"`
+	Size     int32  `json:"size"`
 }
 
-func FileHostCatalog(ep string) (error) {
-	client := http.Client{
-		Timeout: 20 * time.Second,
-	}
-	resp, err := client.Get(ep)
+func GetFileHostCatalog(ep, accessKey, secretKey string) (*FileCatalog, error) {
+	req, err := http.NewRequest("GET", ep, nil)
 	if err != nil {
-		return err
+		return nil, errors.Wrapf(err, "could not create request for ep %q", ep)
+	}
+	if accessKey != "" || secretKey != "" {
+		req.SetBasicAuth(accessKey, secretKey)
+	}
+
+	client := http.Client{
+		Timeout: 5 * time.Second,
+		CheckRedirect: func(r *http.Request, via []*http.Request) error {
+			if accessKey != "" || secretKey != "" {
+				r.SetBasicAuth(accessKey, secretKey) // Redirects will lose basic auth, so reset them manually
+			}
+			return nil
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not send request")
+	}
+	if resp.StatusCode >= 400 {
+		buf, _ := ioutil.ReadAll(resp.Body)
+		return nil, errors.Errorf("Got response code %q, message:\n%s", resp.StatusCode,string(buf))
 	}
 
 	buf, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return nil, errors.Wrap(err, "could not read response body")
 	}
-	fc := &fileCatalog{}
+
+	fc := new(FileCatalog)
 	err = json.Unmarshal(buf, fc)
 	if err != nil {
-		return err
+		return nil, errors.Wrap(err, "could not unmarshall response body")
 	}
-	glog.Infof("DEBUG ---- %#v", fc)
-	return nil
+
+	return fc, nil
 }
