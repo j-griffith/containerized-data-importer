@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-type FileCatalog []ImageMeta
+type Catalog []ImageMeta
 
 type ImageMeta struct {
 	Name     string `json:"name"`
@@ -17,7 +17,14 @@ type ImageMeta struct {
 	Size     int32  `json:"size"`
 }
 
-func GetFileHostCatalog(ep, accessKey, secretKey string) (*FileCatalog, error) {
+type catalog interface {
+	List() []string
+	Size(string) (int, error)
+}
+
+var _ catalog = Catalog{}
+
+func GetCatalog(ep, accessKey, secretKey string) (*Catalog, error) {
 	req, err := http.NewRequest("GET", ep, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not create request for ep %q", ep)
@@ -42,7 +49,7 @@ func GetFileHostCatalog(ep, accessKey, secretKey string) (*FileCatalog, error) {
 	}
 	if resp.StatusCode >= 400 {
 		buf, _ := ioutil.ReadAll(resp.Body)
-		return nil, errors.Errorf("Got response code %q, message:\n%s", resp.StatusCode,string(buf))
+		return nil, errors.Errorf("Got response code %q, message:\n%s", resp.StatusCode, string(buf))
 	}
 
 	buf, err := ioutil.ReadAll(resp.Body)
@@ -50,11 +57,28 @@ func GetFileHostCatalog(ep, accessKey, secretKey string) (*FileCatalog, error) {
 		return nil, errors.Wrap(err, "could not read response body")
 	}
 
-	fc := new(FileCatalog)
+	fc := new(Catalog)
 	err = json.Unmarshal(buf, fc)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not unmarshall response body")
 	}
 
 	return fc, nil
+}
+
+func (c Catalog) List() ([]string) {
+	var files []string
+	for _, i := range c {
+		files = append(files, i.Name)
+	}
+	return files
+}
+
+func (c Catalog) Size(file string) (int, error) {
+	for _, i := range c {
+		if i.Name == file {
+			return int(i.Size), nil
+		}
+	}
+	return -1, errors.Errorf("File %q not found in catalog", file)
 }

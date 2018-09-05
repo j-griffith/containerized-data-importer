@@ -15,8 +15,9 @@ import (
 
 	"kubevirt.io/containerized-data-importer/pkg/common"
 	"kubevirt.io/containerized-data-importer/pkg/controller"
-	"github.com/golang/glog"
 	"strings"
+	"strconv"
+	"time"
 )
 
 var _ = Describe("Transport Tests", func() {
@@ -24,6 +25,7 @@ var _ = Describe("Transport Tests", func() {
 	const (
 		secretPrefix = "transport-e2e-sec"
 		targetFile   = "tinyCore.iso"
+		sizeCheckPod = "size-checker"
 	)
 
 	f, err := framework.NewFramework("", framework.Config{SkipNamespaceCreation: false})
@@ -48,6 +50,10 @@ var _ = Describe("Transport Tests", func() {
 	httpAuthEp := fmt.Sprintf("%s:%d", host, httpAuthPort)
 	httpNoAuthEp := fmt.Sprintf("%s:%d", host, httpNoAuthPort)
 
+	fc, err := utils.GetCatalog(httpNoAuthEp, "", "")
+	targetSize, err := fc.Size(targetFile)
+	handelError(err)
+
 	var ns string
 	BeforeEach(func() {
 		ns = f.Namespace.Name
@@ -62,11 +68,6 @@ var _ = Describe("Transport Tests", func() {
 			err error // prevent shadowing
 			sec *v1.Secret
 		)
-
-		fc, err := utils.GetFileHostCatalog(ip, accessKey, secretKey)
-		Expect(err).NotTo(HaveOccurred())
-		glog.Infof("Catalog: %#v", fc)
-
 
 		pvcAnn := map[string]string{
 			controller.AnnEndpoint: ip + "/" + file,
@@ -92,7 +93,20 @@ var _ = Describe("Transport Tests", func() {
 		Expect(err).NotTo(HaveOccurred(), "Error waiting for claim phase Bound")
 
 		By("Verifying PVC is not empty")
-		Expect(framework.VerifyPVCIsEmpty(f, pvc)).To(BeFalse())
+		Expect(framework.VerifyPVCIsEmpty(f, pvc)).To(BeFalse(), "Found 0 imported files on PVC")
+
+		By("Verifying imported file size matches base iso size")
+		pod, err := utils.CreateExecutorPodWithPVC(c, sizeCheckPod, ns, pvc)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(utils.WaitTimeoutForPodReady(c, sizeCheckPod, ns, 20*time.Second)).To(Succeed())
+
+		stdout := f.ExecShellInPod(pod.Name, ns, "stat -c %b /pvc/disk.img")
+		By("DEBUG -------- stdout: " + stdout)
+		Expect(err).NotTo(HaveOccurred(), "Error getting size of imported file")
+
+		importSize, err := strconv.Atoi(stdout)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(importSize).To(Equal(targetSize), "Expect imported file size to match remote file size")
 	}
 
 	DescribeTable("Transport Test Table", it,
