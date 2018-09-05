@@ -1,11 +1,12 @@
 package utils
 
 import (
-	"net/http"
 	"encoding/json"
 	"io/ioutil"
-	"github.com/pkg/errors"
+	"net/http"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 type Catalog []ImageMeta
@@ -66,7 +67,7 @@ func GetCatalog(ep, accessKey, secretKey string) (*Catalog, error) {
 	return fc, nil
 }
 
-func (c Catalog) List() ([]string) {
+func (c Catalog) List() []string {
 	var files []string
 	for _, i := range c {
 		files = append(files, i.Name)

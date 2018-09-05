@@ -2,22 +2,21 @@ package tests
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 
-	"kubevirt.io/containerized-data-importer/tests/framework"
-	"kubevirt.io/containerized-data-importer/tests/utils"
-
 	"k8s.io/api/core/v1"
 
 	"kubevirt.io/containerized-data-importer/pkg/common"
 	"kubevirt.io/containerized-data-importer/pkg/controller"
-	"strings"
-	"strconv"
-	"time"
+	"kubevirt.io/containerized-data-importer/tests/framework"
+	"kubevirt.io/containerized-data-importer/tests/utils"
 )
 
 var _ = Describe("Transport Tests", func() {
