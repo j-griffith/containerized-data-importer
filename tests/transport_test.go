@@ -51,6 +51,7 @@ var _ = Describe("Transport Tests", func() {
 	httpNoAuthEp := fmt.Sprintf("%s:%d", host, httpNoAuthPort)
 
 	fc, err := utils.GetCatalog(httpNoAuthEp, "", "")
+	handelError(err)
 	targetSize, err := fc.Size(targetFile)
 	handelError(err)
 
@@ -95,13 +96,12 @@ var _ = Describe("Transport Tests", func() {
 		By("Verifying PVC is not empty")
 		Expect(framework.VerifyPVCIsEmpty(f, pvc)).To(BeFalse(), "Found 0 imported files on PVC")
 
-		By("Verifying imported file size matches base iso size")
+		By("Verifying imported file size matches " + targetFile + "size")
 		pod, err := utils.CreateExecutorPodWithPVC(c, sizeCheckPod, ns, pvc)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(utils.WaitTimeoutForPodReady(c, sizeCheckPod, ns, 20*time.Second)).To(Succeed())
 
-		stdout := f.ExecShellInPod(pod.Name, ns, "stat -c %b /pvc/disk.img")
-		By("DEBUG -------- stdout: " + stdout)
+		stdout := f.ExecShellInPod(pod.Name, ns, "wc -c < /pvc/disk.img")
 		Expect(err).NotTo(HaveOccurred(), "Error getting size of imported file")
 
 		importSize, err := strconv.Atoi(stdout)
