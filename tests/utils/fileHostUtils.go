@@ -9,8 +9,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Catalog holds all ImageMeta objects parsed from a response by the cdi file host.
 type Catalog []ImageMeta
 
+// ImageMeta is defined to match a single file's meta data element in a json list response
+// from the cdi file host when the request is sent to the server root path
 type ImageMeta struct {
 	Name     string `json:"name"`
 	ItemType string `json:"type"`
@@ -25,6 +28,10 @@ type catalog interface {
 
 var _ catalog = Catalog{}
 
+// GetCatalog sends a request to the endpoint `ep` (with credentials if defined),
+// which is expected to be the cdi file host's server root `/`
+// The file server is configured to return a json array of objects matching ImageMeta
+// definition. The response is parsed into a Catalog object, which is returned.
 func GetCatalog(ep, accessKey, secretKey string) (*Catalog, error) {
 	req, err := http.NewRequest("GET", ep, nil)
 	if err != nil {
@@ -48,12 +55,10 @@ func GetCatalog(ep, accessKey, secretKey string) (*Catalog, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "could not send request")
 	}
+	buf, _ := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode >= 400 {
-		buf, _ := ioutil.ReadAll(resp.Body)
 		return nil, errors.Errorf("Got response code %q, message:\n%s", resp.StatusCode, string(buf))
 	}
-
-	buf, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not read response body")
 	}
@@ -67,6 +72,7 @@ func GetCatalog(ep, accessKey, secretKey string) (*Catalog, error) {
 	return fc, nil
 }
 
+// List generates a slice of file names from the Catalog.
 func (c Catalog) List() []string {
 	var files []string
 	for _, i := range c {
@@ -75,6 +81,8 @@ func (c Catalog) List() []string {
 	return files
 }
 
+// Size searches the catalog for a file name matching the parameter and returns the associated size
+// If no match is found, returns an error and size of -1
 func (c Catalog) Size(file string) (int, error) {
 	for _, i := range c {
 		if i.Name == file {
