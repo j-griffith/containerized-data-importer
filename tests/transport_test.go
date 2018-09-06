@@ -7,10 +7,10 @@ import (
 
 	"net/url"
 
+	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
-	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 
@@ -31,10 +31,9 @@ var _ = Describe("Transport Tests", func() {
 	f := framework.NewFrameworkOrDie("transport", framework.Config{SkipNamespaceCreation: false})
 	c := f.K8sClient
 
-	hostUrl, err := url.Parse(f.RestConfig.Host)
+	hostURL, err := url.Parse(f.RestConfig.Host)
 	handelError(err)
-	ip := hostUrl.Hostname()
-
+	ip := hostURL.Hostname()
 
 	fileHostService := utils.GetServiceInNamespaceOrDie(c, utils.FileHostNs, utils.FileHostName)
 	httpAuthPort, err := utils.GetServiceNodePortByName(fileHostService, utils.HttpAuthPortName)
@@ -85,12 +84,12 @@ var _ = Describe("Transport Tests", func() {
 		Expect(err).NotTo(HaveOccurred(), "Error creating PVC")
 
 		importer, err := utils.FindPodByPrefix(c, ns, common.IMPORTER_PODNAME, common.CDI_LABEL_SELECTOR)
-		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Unable to get importer pod %q", ns + "/" + common.IMPORTER_PODNAME))
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Unable to get importer pod %q", ns+"/"+common.IMPORTER_PODNAME))
 
 		Expect(utils.WaitTimeoutForPodStatus(c, importer.Name, importer.Namespace, v1.PodSucceeded, utils.PodWaitForTime)).To(Succeed())
 
 		By("Verifying PVC is not empty")
-		Expect(framework.VerifyPVCIsEmpty(f, pvc)).To(BeFalse(), fmt.Sprintf("Found 0 imported files on PVC %q", pvc.Namespace + "/" + pvc.Name))
+		Expect(framework.VerifyPVCIsEmpty(f, pvc)).To(BeFalse(), fmt.Sprintf("Found 0 imported files on PVC %q", pvc.Namespace+"/"+pvc.Name))
 
 		By(fmt.Sprintf("Verifying imported file size matches %q size of %d bytes", targetFile, targetSize))
 		pod, err := utils.CreateExecutorPodWithPVC(c, sizeCheckPod, ns, pvc)
@@ -105,7 +104,6 @@ var _ = Describe("Transport Tests", func() {
 		Expect(importSize).To(Equal(targetSize), "Expect imported file size to match remote file size")
 	}
 
-	
 	DescribeTable("Transport Test Table", it,
 		Entry("should connect to http endpoint without credentials", httpNoAuthEp, targetFile, "", ""),
 		Entry("should connect to http endpoint with credentials", httpAuthEp, targetFile, utils.AccessKeyValue, utils.SecretKeyValue))
