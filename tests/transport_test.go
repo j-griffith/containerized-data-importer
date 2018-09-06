@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
+	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 
@@ -17,7 +18,6 @@ import (
 	"kubevirt.io/containerized-data-importer/pkg/controller"
 	"kubevirt.io/containerized-data-importer/tests/framework"
 	"kubevirt.io/containerized-data-importer/tests/utils"
-	"github.com/golang/glog"
 )
 
 var _ = Describe("Transport Tests", func() {
@@ -84,13 +84,15 @@ var _ = Describe("Transport Tests", func() {
 		pvc, err := utils.CreatePVCFromDefinition(c, ns, utils.NewPVCDefinition("transport-e2e", "20M", pvcAnn, nil))
 		Expect(err).NotTo(HaveOccurred(), "Error creating PVC")
 
-		err = utils.WaitForPersistentVolumeClaimPhase(c, ns, v1.ClaimBound, pvc.Name)
-		Expect(err).NotTo(HaveOccurred(), "Error waiting for claim phase Bound")
+		importer, err := utils.FindPodByPrefix(c, ns, common.IMPORTER_PODNAME, common.CDI_LABEL_SELECTOR)
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Unable to get importer pod %q", ns + "/" + common.IMPORTER_PODNAME))
+
+		Expect(utils.WaitTimeoutForPodStatus(c, importer.Name, importer.Namespace, v1.PodSucceeded, utils.PodWaitForTime)).To(Succeed())
 
 		By("Verifying PVC is not empty")
-		Expect(framework.VerifyPVCIsEmpty(f, pvc)).To(BeFalse(), "Found 0 imported files on PVC")
+		Expect(framework.VerifyPVCIsEmpty(f, pvc)).To(BeFalse(), fmt.Sprintf("Found 0 imported files on PVC %q", pvc.Namespace + "/" + pvc.Name))
 
-		By(fmt.Sprintf("Verifying imported file size matches %q size", targetFile))
+		By(fmt.Sprintf("Verifying imported file size matches %q size of %d bytes", targetFile, targetSize))
 		pod, err := utils.CreateExecutorPodWithPVC(c, sizeCheckPod, ns, pvc)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(utils.WaitTimeoutForPodReady(c, sizeCheckPod, ns, 20*time.Second)).To(Succeed())
