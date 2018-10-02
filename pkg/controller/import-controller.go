@@ -10,6 +10,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"fmt"
+
 	"kubevirt.io/containerized-data-importer/pkg/common"
 )
 
@@ -105,7 +106,8 @@ func (ic *ImportController) processPvcItem(pvc *v1.PersistentVolumeClaim) error 
 		}
 		// all checks passed, let's create the importer pod!
 		ic.expectPodCreate(pvcKey)
-		pod, err = CreateImporterPod(ic.clientset, ic.image, ic.verbose, ic.pullPolicy, ep, secretName, pvc)
+		//pod, err = CreateImporterPod(ic.clientset, ic.image, ic.verbose, ic.pullPolicy, ep, secretName, pvc)
+		err = CreateImporterPod(ic.clientset, ic.image, ic.verbose, ic.pullPolicy, ep, secretName, pvc)
 		if err != nil {
 			ic.observePodCreate(pvcKey)
 			return err

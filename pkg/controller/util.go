@@ -10,12 +10,15 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
+	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+
+	//kubeclient "k8s.io/kubernetes/pkg/client"
 	"kubevirt.io/containerized-data-importer/pkg/common"
 	"kubevirt.io/containerized-data-importer/pkg/keys"
 )
@@ -156,16 +159,101 @@ func checkIfLabelExists(pvc *v1.PersistentVolumeClaim, lbl string, val string) b
 // CreateImporterPod creates and returns a pointer to a pod which is created based on the passed-in endpoint, secret
 // name, and pvc. A nil secret means the endpoint credentials are not passed to the
 // importer pod.
-func CreateImporterPod(client kubernetes.Interface, image, verbose, pullPolicy, ep, secretName string, pvc *v1.PersistentVolumeClaim) (*v1.Pod, error) {
-	ns := pvc.Namespace
-	pod := MakeImporterPodSpec(image, verbose, pullPolicy, ep, secretName, pvc)
+func CreateImporterPod(client kubernetes.Interface, image, verbose, pullPolicy, ep, secretName string, pvc *v1.PersistentVolumeClaim) error {
+	//ns := pvc.Namespace
+	//pod := MakeImporterPodSpec(image, verbose, pullPolicy, ep, secretName, pvc)
+	j := makeImporterJob(image, verbose, pullPolicy, ep, secretName, pvc)
+	client.CoreV1().RESTClient().Post().AbsPath("/apis/batch/v1/namespace/default/jobs").Body(j).Do().Error()
+	return nil
+}
 
-	pod, err := client.CoreV1().Pods(ns).Create(pod)
-	if err != nil {
-		return nil, errors.Wrap(err, "importer pod API create errored")
+func makeImporterJob(image, verbose, pullPolicy, ep, secret string, pvc *v1.PersistentVolumeClaim) *batch.Job {
+	podName := fmt.Sprintf("%s-%s-", common.ImporterPodName, pvc.Name)
+
+	blockOwnerDeletion := true
+	isController := true
+	job := &batch.Job{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Job",
+			APIVersion: "batch/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: podName,
+			Annotations: map[string]string{
+				AnnCreatedBy: "yes",
+			},
+			Labels: map[string]string{
+				common.CDILabelKey: common.CDILabelValue,
+				// this label is used when searching for a pvc's import pod.
+				LabelImportPvc: pvc.Name,
+			},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "v1",
+					Kind:               "PersistentVolumeClaim",
+					Name:               pvc.Name,
+					UID:                pvc.GetUID(),
+					BlockOwnerDeletion: &blockOwnerDeletion,
+					Controller:         &isController,
+				},
+			},
+		},
+		Spec: batch.JobSpec{
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: podName,
+					Annotations: map[string]string{
+						AnnCreatedBy: "yes",
+					},
+					Labels: map[string]string{
+						common.CDILabelKey: common.CDILabelValue,
+						// this label is used when searching for a pvc's import pod.
+						LabelImportPvc: pvc.Name,
+					},
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion:         "v1",
+							Kind:               "PersistentVolumeClaim",
+							Name:               pvc.Name,
+							UID:                pvc.GetUID(),
+							BlockOwnerDeletion: &blockOwnerDeletion,
+							Controller:         &isController,
+						},
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:            common.ImporterPodName,
+							Image:           image,
+							ImagePullPolicy: v1.PullPolicy(pullPolicy),
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      DataVolName,
+									MountPath: common.ImporterDataDir,
+								},
+							},
+							Args: []string{"-v=" + verbose},
+						},
+					},
+					RestartPolicy: v1.RestartPolicyOnFailure,
+					Volumes: []v1.Volume{
+						{
+							Name: DataVolName,
+							VolumeSource: v1.VolumeSource{
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: pvc.Name,
+									ReadOnly:  false,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
-	glog.V(1).Infof("importer pod \"%s/%s\" (image: %q) created\n", pod.Namespace, pod.Name, image)
-	return pod, nil
+
+	return job
 }
 
 // MakeImporterPodSpec creates and return the importer pod spec based on the passed-in endpoint, secret and pvc.
@@ -177,8 +265,8 @@ func MakeImporterPodSpec(image, verbose, pullPolicy, ep, secret string, pvc *v1.
 	isController := true
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
+			Kind:       "Job",
+			APIVersion: "batch/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: podName,
