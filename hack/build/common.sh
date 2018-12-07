@@ -12,7 +12,11 @@
 #See the License for the specific language governing permissions and
 #limitations under the License.
 
-CDI_DIR="$(readlink -f $(dirname $0)/../../)"
+#CDI_DIR="$(readlink -f $(dirname $0)/../../)"
+CDI_DIR="$(
+  cd "$(dirname "$BASH_SOURCE[0]")/../../"
+  pwd
+)"
 BIN_DIR=${CDI_DIR}/bin
 OUT_DIR=${CDI_DIR}/_out
 CMD_OUT_DIR=${OUT_DIR}/cmd
