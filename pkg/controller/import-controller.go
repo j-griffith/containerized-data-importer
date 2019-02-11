@@ -2,9 +2,11 @@ package controller
 
 import (
 	"fmt"
+
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -94,6 +96,22 @@ func (ic *ImportController) processPvcItem(pvc *v1.PersistentVolumeClaim) error 
 	// us to observe a pod's creation in the cache.
 	needsSync := ic.podExpectations.SatisfiedExpectations(pvcKey)
 
+	if pvc.DeletionTimestamp != nil {
+		// User has requested a delete of the PVC, help them out by deleting any Importer PODs that might be running through retry loops
+		dReq := podDeleteRequest{
+			namespace: pod.Namespace,
+			podName:   pod.Name,
+			podLister: ic.Controller.podLister,
+			k8sClient: ic.Controller.clientset,
+		}
+		err := deletePod(dReq)
+		if err != nil && !k8serrors.IsNotFound(err) {
+			glog.V(3).Infof("error encountered cleaning up associated PODS for PVC: %v", err)
+			return err
+		}
+		return nil
+
+	}
 	// make sure not to reprocess a PVC that has already completed successfully,
 	// even if the pod no longer exists
 	previousPhase, exists := pvc.ObjectMeta.Annotations[AnnPodPhase]
